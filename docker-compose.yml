@@ -1,0 +1,219 @@
+version: '3.8'
+
+services:
+  # ==========================================================================
+  # Orchestrator LLM (Ollama) - For intent classification and validation
+  # ==========================================================================
+  orchestrator-ollama:
+    image: ollama/ollama:latest
+    container_name: airag-orchestrator-ollama
+    ports:
+      - "11434:11434"
+    volumes:
+      - ./data/orchestrator-models:/root/.ollama
+    environment:
+      - OLLAMA_HOST=0.0.0.0
+      - OLLAMA_ORIGINS=*
+    deploy:
+      resources:
+        reservations:
+          devices:
+            - driver: nvidia
+              count: 1
+              capabilities: [gpu]
+    restart: unless-stopped
+    networks:
+      - airag-network
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:11434/api/tags"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+
+  # ==========================================================================
+  # Worker LLM (Ollama) - For RAG execution and answer generation
+  # ==========================================================================
+  worker-ollama:
+    image: ollama/ollama:latest
+    container_name: airag-worker-ollama
+    ports:
+      - "11435:11434"
+    volumes:
+      - ./data/worker-models:/root/.ollama
+    environment:
+      - OLLAMA_HOST=0.0.0.0
+      - OLLAMA_ORIGINS=*
+    deploy:
+      resources:
+        reservations:
+          devices:
+            - driver: nvidia
+              count: 1
+              capabilities: [gpu]
+    restart: unless-stopped
+    networks:
+      - airag-network
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:11434/api/tags"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+
+  # ==========================================================================
+  # Orchestrator API - Intent classification, planning, validation
+  # ==========================================================================
+  orchestrator-api:
+    build:
+      context: ./services/orchestrator
+      dockerfile: Dockerfile
+    container_name: airag-orchestrator-api
+    ports:
+      - "8000:8000"
+    volumes:
+      - ./services/orchestrator:/app
+      - ./data/cache:/app/cache
+    environment:
+      - ORCHESTRATOR_OLLAMA_URL=http://orchestrator-ollama:11434
+      - WORKER_API_URL=http://worker-api:8001
+      - ORCHESTRATOR_MODEL=${ORCHESTRATOR_MODEL:-qwen2.5:14b}
+      - LOG_LEVEL=${LOG_LEVEL:-INFO}
+      - STREAMING_ENABLED=${STREAMING_ENABLED:-true}
+      - CONFIDENCE_THRESHOLD=${ORCHESTRATOR_CONFIDENCE_THRESHOLD:-0.7}
+    depends_on:
+      - orchestrator-ollama
+      - worker-api
+    restart: unless-stopped
+    networks:
+      - airag-network
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8000/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+
+  # ==========================================================================
+  # Worker API - RAG execution, structured lookups, context building
+  # ==========================================================================
+  worker-api:
+    build:
+      context: ./services/worker
+      dockerfile: Dockerfile
+    container_name: airag-worker-api
+    ports:
+      - "8001:8001"
+    volumes:
+      - ./services/worker:/app
+      - ./data/embeddings:/app/embeddings
+    environment:
+      - WORKER_OLLAMA_URL=http://worker-ollama:11434
+      - QDRANT_URL=http://qdrant:6333
+      - WORKER_MODEL=${WORKER_MODEL:-qwen2.5:32b}
+      - EMBEDDING_MODEL=${EMBEDDING_MODEL:-all-MiniLM-L6-v2}
+      - QDRANT_COLLECTION=${QDRANT_COLLECTION:-documents}
+      - TOP_K_RESULTS=${WORKER_TOP_K_RESULTS:-8}
+      - LOG_LEVEL=${LOG_LEVEL:-INFO}
+    depends_on:
+      - worker-ollama
+      - qdrant
+    restart: unless-stopped
+    networks:
+      - airag-network
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8001/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+
+  # ==========================================================================
+  # Qdrant - Vector database for document embeddings
+  # ==========================================================================
+  qdrant:
+    image: qdrant/qdrant:latest
+    container_name: airag-qdrant
+    ports:
+      - "6333:6333"
+      - "6334:6334"
+    volumes:
+      - ./data/qdrant:/qdrant/storage
+    environment:
+      - QDRANT__SERVICE__GRPC_PORT=6334
+    restart: unless-stopped
+    networks:
+      - airag-network
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:6333/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+
+  # ==========================================================================
+  # Crawler - Web crawling and document ingestion
+  # ==========================================================================
+  crawler:
+    build:
+      context: ./services/crawler
+      dockerfile: Dockerfile
+    container_name: airag-crawler
+    volumes:
+      - ./services/crawler:/app
+      - ./data/cache:/app/cache
+      - ./secrets:/app/secrets
+    environment:
+      - QDRANT_URL=http://qdrant:6333
+      - QDRANT_COLLECTION=${QDRANT_COLLECTION:-documents}
+      - WORKER_OLLAMA_URL=http://worker-ollama:11434
+      - EMBEDDING_MODEL=${EMBEDDING_MODEL:-all-MiniLM-L6-v2}
+      - MAX_PAGES_PER_DOMAIN=${MAX_PAGES_PER_DOMAIN:-1000}
+      - CRAWL_DELAY_SECONDS=${CRAWL_DELAY_SECONDS:-1}
+      - MAX_DEPTH=${MAX_DEPTH:-5}
+      - LOG_LEVEL=${LOG_LEVEL:-INFO}
+    depends_on:
+      - qdrant
+      - worker-ollama
+    restart: "no"  # CLI-based, doesn't need auto-restart
+    networks:
+      - airag-network
+    profiles:
+      - crawler  # Only starts when explicitly called
+
+  # ==========================================================================
+  # Frontend - Web UI with streaming and thinking display
+  # ==========================================================================
+  frontend:
+    build:
+      context: ./services/frontend
+      dockerfile: Dockerfile
+    container_name: airag-frontend
+    ports:
+      - "8080:80"
+    volumes:
+      - ./services/frontend:/usr/share/nginx/html:ro
+      - ./services/frontend/nginx.conf:/etc/nginx/conf.d/default.conf:ro
+    environment:
+      - ORCHESTRATOR_API_URL=http://orchestrator-api:8000
+    depends_on:
+      - orchestrator-api
+    restart: unless-stopped
+    networks:
+      - airag-network
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:80"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+
+# ==========================================================================
+# Networks
+# ==========================================================================
+networks:
+  airag-network:
+    driver: bridge
+    name: airag-network
+
+# ==========================================================================
+# Volumes (optional named volumes for persistence)
+# ==========================================================================
+volumes:
+  orchestrator-models:
+  worker-models:
+  qdrant-storage:

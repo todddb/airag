@@ -1,0 +1,191 @@
+# =============================================================================
+# AI RAG .gitignore
+# =============================================================================
+
+# =============================================================================
+# Python
+# =============================================================================
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+build/
+develop-eggs/
+dist/
+downloads/
+eggs/
+.eggs/
+lib/
+lib64/
+parts/
+sdist/
+var/
+wheels/
+share/python-wheels/
+*.egg-info/
+.installed.cfg
+*.egg
+MANIFEST
+.venv
+venv/
+ENV/
+env/
+.python-version
+
+# =============================================================================
+# Docker & Environment
+# =============================================================================
+.env
+.env.local
+.env.*.local
+docker-compose.override.yml
+
+# =============================================================================
+# Data & Storage
+# =============================================================================
+data/
+qdrant_storage/
+ollama_models/
+*.db
+*.sqlite
+*.sqlite3
+cache/
+embeddings/
+
+# Secrets
+secrets/
+*.key
+*.pem
+*.p12
+*.pfx
+auth_state.json
+storage_state.json
+
+# =============================================================================
+# Logs
+# =============================================================================
+*.log
+logs/
+log/
+*.log.*
+
+# =============================================================================
+# IDE & Editors
+# =============================================================================
+.vscode/
+.idea/
+*.swp
+*.swo
+*.swn
+*~
+.DS_Store
+Thumbs.db
+
+# JetBrains
+*.iml
+.idea/
+*.ipr
+*.iws
+out/
+
+# VS Code
+.vscode/
+*.code-workspace
+
+# Sublime Text
+*.sublime-project
+*.sublime-workspace
+
+# =============================================================================
+# Testing
+# =============================================================================
+.pytest_cache/
+.coverage
+coverage.xml
+*.cover
+.hypothesis/
+htmlcov/
+.tox/
+.nox/
+
+# =============================================================================
+# Jupyter Notebooks
+# =============================================================================
+.ipynb_checkpoints
+*.ipynb
+
+# =============================================================================
+# OS Files
+# =============================================================================
+.DS_Store
+.DS_Store?
+._*
+.Spotlight-V100
+.Trashes
+ehthumbs.db
+Desktop.ini
+$RECYCLE.BIN/
+
+# =============================================================================
+# Temporary Files
+# =============================================================================
+*.tmp
+*.temp
+*.bak
+*.backup
+tmp/
+temp/
+
+# =============================================================================
+# Build Artifacts
+# =============================================================================
+node_modules/
+bower_components/
+*.min.js
+*.min.css
+dist/
+build/
+out/
+
+# =============================================================================
+# Project-Specific
+# =============================================================================
+
+# Crawl data
+crawl_results/
+download_cache/
+page_cache/
+
+# Model files (too large for git)
+*.gguf
+*.bin
+*.safetensors
+models/
+checkpoints/
+
+# Backups
+backups/
+*.backup
+*.bak
+
+# Exports
+exports/
+*.jsonl
+*.csv
+*.xlsx
+
+# Benchmarks
+benchmark_results/
+*.bench
+
+# Project dumps
+project_dump.txt
+project_dump_with_artifacts.txt
+
+# =============================================================================
+# Allow These (Override)
+# =============================================================================
+!.gitkeep
+!examples/example_data/
+!docs/

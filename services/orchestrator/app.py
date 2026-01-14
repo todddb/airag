@@ -243,21 +243,21 @@ async def classify_intent(request: QuestionRequest):
 # Validation-Only Endpoint (for debugging)
 # =============================================================================
 
+class ValidateRequest(BaseModel):
+    """Request model for validation endpoint."""
+    question: str = Field(..., description="Original question")
+    answer: str = Field(..., description="Answer to validate")
+    citations: list = Field(default=[], description="Citations provided")
+
 @app.post("/validate")
-async def validate_response(
-    question: str = Field(..., description="Original question"),
-    answer: str = Field(..., description="Answer to validate"),
-    citations: list = Field(default=[], description="Citations provided"),
-):
+async def validate_response(request: ValidateRequest):
     """
     Validate a response without full orchestration.
     
     Useful for testing validation logic.
     
     Args:
-        question: Original question
-        answer: Answer to validate
-        citations: Citations provided with answer
+        request: Validation request with question, answer, citations
         
     Returns:
         Validation result
@@ -266,9 +266,9 @@ async def validate_response(
     
     try:
         validation = await orchestrator.validate_response(
-            question=question,
-            answer=answer,
-            citations=citations,
+            question=request.question,
+            answer=request.answer,
+            citations=request.citations,
         )
         return JSONResponse(content=validation.model_dump())
     except Exception as e:

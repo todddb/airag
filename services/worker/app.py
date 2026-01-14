@@ -327,17 +327,18 @@ async def execute_fuzzy_match(request: ExecuteRequest) -> Dict[str, Any]:
 # Direct Endpoints (for testing)
 # =============================================================================
 
+class RAGSearchRequest(BaseModel):
+    """Request model for RAG search endpoint."""
+    query: str = Field(..., description="Search query")
+    top_k: int = Field(8, description="Number of results")
+
 @app.post("/rag_search")
-async def rag_search(
-    query: str = Field(..., description="Search query"),
-    top_k: int = Field(8, description="Number of results"),
-):
+async def rag_search(request: RAGSearchRequest):
     """
     Direct RAG search endpoint (for testing).
     
     Args:
-        query: Search query
-        top_k: Number of results
+        request: RAG search request with query and top_k
         
     Returns:
         Search results with generated answer
@@ -346,8 +347,8 @@ async def rag_search(
     
     try:
         result = await rag_engine.search_and_generate(
-            query=query,
-            top_k=top_k,
+            query=request.query,
+            top_k=request.top_k,
         )
         return JSONResponse(content=result)
     except Exception as e:
@@ -357,17 +358,18 @@ async def rag_search(
             detail=f"Error in RAG search: {str(e)}"
         )
 
+class StructuredLookupRequest(BaseModel):
+    """Request model for structured lookup endpoint."""
+    entity_type: str = Field(..., description="Type of entity")
+    entity: str = Field(..., description="Entity to look up")
+
 @app.post("/structured_lookup")
-async def structured_lookup_direct(
-    entity_type: str = Field(..., description="Type of entity"),
-    entity: str = Field(..., description="Entity to look up"),
-):
+async def structured_lookup_direct(request: StructuredLookupRequest):
     """
     Direct structured lookup endpoint (for testing).
     
     Args:
-        entity_type: Type of entity (location_rate, etc.)
-        entity: Entity value
+        request: Structured lookup request with entity_type and entity
         
     Returns:
         Lookup result
@@ -376,9 +378,9 @@ async def structured_lookup_direct(
     
     try:
         result = await structured_lookup.lookup(
-            entity_type=entity_type,
-            params={"entity": entity},
-            question=f"Lookup {entity}",
+            entity_type=request.entity_type,
+            params={"entity": request.entity},
+            question=f"Lookup {request.entity}",
         )
         return JSONResponse(content=result)
     except Exception as e:
